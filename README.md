@@ -17,7 +17,7 @@ pip install -r requirements.txt
 ```
 At this point, you should be ready to run the importer script to create and populate the sqlite3 database, by running the following command.
 ```
-python model.py test_project.db
+python importer.py test_project.db
 ```
 The "test_project.db" database name can be anything you want. If you run the command exactly as above, you will see a new test_project.db file in the python_sample_data_analysis project folder. This DB will have all the grid load and location weather data populated in two data tables.
 
