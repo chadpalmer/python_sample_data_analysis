@@ -136,3 +136,6 @@ dmypy.json
 
 # DBs
 *.db
+
+# output files
+forecast_output*.csv
