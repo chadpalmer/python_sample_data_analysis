@@ -4,55 +4,75 @@ from open_files import OpenFiles
 from date_time_util import DateTimeUtil
 
 
-print("Importing data. Please wait...")
-db_connection = ConnectDB.connect_db(sys.argv[1])
+def do_import():
+    print("Importing data. Please wait...")
+    db_connection = ConnectDB.connect_db(sys.argv[1])
+    if db_connection is not None:
+        bln_load_imported = import_load(db_connection)
+        if bln_load_imported:
+            bln_weather_imported = import_weather_obs(db_connection)
+            if bln_weather_imported:
+                print("Import successful. Both system load and weather obs data have been imported successfully.")
+            else:
+                print("Import failed. Data table for weather observations could not be created.")
+        else:
+            print("Import failed. Data table for system load could not be created.")
 
-if db_connection is not None:
-    # First, lets get the system load tables imported
-    # Start by creating DB table for system load
-    str_sql_table_command = '''CREATE TABLE IF NOT EXISTS system_load (
-                                    id integer PRIMARY KEY,
-                                    OperDay text,
-                                    HourEnding text,
-                                    COAST real,
-                                    EAST real,
-                                    FAR_WEST real,
-                                    NORTH real,
-                                    NORTH_C real,
-                                    SOUTHERN real,
-                                    SOUTH_C real,
-                                    WEST real,
-                                    TOTAL real,
-                                    DSTFlag text,
-                                    day_id integer,
-                                    hour_id integer,
-                                    year integer
-                                );'''
-    bln_table_created = ConnectDB.create_table(db_connection, str_sql_table_command)
-    if bln_table_created:
-        csv_list = OpenFiles.get_file_list("./system_load_by_weather_zone", "csv")
-        # Now, let's loop through all the files and add the info to the new system_load DB table.
-        for csv_file in csv_list:
-            row_list = OpenFiles.open_csv_file(csv_file, ",")
-            for index, row in enumerate(row_list):
-                if index != 0:
-                    row_date = DateTimeUtil.string_to_date(row[0], "America/Chicago")
-
-                    # Calculating and adding day_id and hour_id to row list so that I can tie together the weather
-                    # data table to the system load data table
-                    row.append(DateTimeUtil.get_day_of_year(row_date))
-                    time_list = row[1].split(":")
-                    row.append(int(time_list[0]))
-                    row.append(row_date.year)
-                    for i in range(2, 11):
-                        row[i] = float(row[i])
-
-                    # Now let's insert the data row into the system_load DB table
-                    str_sql_row_command = '''INSERT INTO system_load(OperDay,HourEnding,COAST,EAST,FAR_WEST,NORTH,NORTH_C,SOUTHERN,SOUTH_C,WEST,TOTAL,DSTFlag,day_id,hour_id,year) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'''
-                    row_id = ConnectDB.insert_row_into_table(db_connection, str_sql_row_command, tuple(row))
+        clean_up(db_connection)
     else:
-        print("Import failed. Data table for system load could not be created.")
+        print("Import failed. Database connection could not be established.")
 
+
+def import_load(db_connection):
+    if db_connection is not None:
+        # First, lets get the system load tables imported
+        # Start by creating DB table for system load
+        str_sql_table_command = '''CREATE TABLE IF NOT EXISTS system_load (
+                                        id integer PRIMARY KEY,
+                                        OperDay text,
+                                        HourEnding text,
+                                        COAST real,
+                                        EAST real,
+                                        FAR_WEST real,
+                                        NORTH real,
+                                        NORTH_C real,
+                                        SOUTHERN real,
+                                        SOUTH_C real,
+                                        WEST real,
+                                        TOTAL real,
+                                        DSTFlag text,
+                                        day_id integer,
+                                        hour_id integer,
+                                        year integer
+                                    );'''
+        bln_table_created = ConnectDB.create_table(db_connection, str_sql_table_command)
+        if bln_table_created:
+            csv_list = OpenFiles.get_file_list("./system_load_by_weather_zone", "csv")
+            # Now, let's loop through all the files and add the info to the new system_load DB table.
+            for csv_file in csv_list:
+                row_list = OpenFiles.open_csv_file(csv_file, ",")
+                for index, row in enumerate(row_list):
+                    if index != 0:
+                        row_date = DateTimeUtil.string_to_date(row[0], "America/Chicago")
+
+                        # Calculating and adding day_id and hour_id to row list so that I can tie together the weather
+                        # data table to the system load data table
+                        row.append(DateTimeUtil.get_day_of_year(row_date))
+                        time_list = row[1].split(":")
+                        row.append(int(time_list[0]))
+                        row.append(row_date.year)
+                        for i in range(2, 11):
+                            row[i] = float(row[i])
+
+                        # Now let's insert the data row into the system_load DB table
+                        str_sql_row_command = '''INSERT INTO system_load(OperDay,HourEnding,COAST,EAST,FAR_WEST,NORTH,NORTH_C,SOUTHERN,SOUTH_C,WEST,TOTAL,DSTFlag,day_id,hour_id,year) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'''
+                        row_id = ConnectDB.insert_row_into_table(db_connection, str_sql_row_command, tuple(row))
+            return True
+        else:
+            return False
+
+
+def import_weather_obs(db_connection):
     # Now let us tackle the weather observation tables for the various stations
     str_sql_table_command = '''CREATE TABLE IF NOT EXISTS weather_obs (
                                     id integer PRIMARY KEY,
@@ -121,9 +141,13 @@ if db_connection is not None:
                                 str_sql_row_command = '''INSERT INTO weather_obs(TimeCST,temperature,dewpoint,humidity,sea_level_pressure,visibility,wind_direction,wind_speed,gust_speed,precip,events,conditions,wind_dir_degrees,date_utc,location,day_id,hour_id,year) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'''
                                 row_id = ConnectDB.insert_row_into_table(db_connection, str_sql_row_command, tuple(row))
                                 # print(row)
+        return True
     else:
-        print("Import failed. Data table for weather observations could not be created.")
+        return False
 
+
+def clean_up(db_connection):
     ConnectDB.close_connection(db_connection)
-else:
-    "Import failed. Database connection could not be established."
+
+
+do_import()
